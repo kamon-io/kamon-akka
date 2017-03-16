@@ -3,7 +3,7 @@ package akka.kamon.instrumentation
 import akka.actor.{ Cell, ActorRef, ActorSystem }
 import akka.kamon.instrumentation.ActorMonitors.{ TrackedRoutee, TrackedActor }
 import kamon.Kamon
-import kamon.akka.{ RouterMetrics, ActorMetrics }
+import kamon.akka.{ RouterMetrics, ActorMetrics, ActorGroupConfig, ActorGroupMetrics }
 import kamon.metric.Entity
 import kamon.trace.{ EmptyTraceContext, Tracer }
 import kamon.util.RelativeNanoTimestamp
@@ -32,11 +32,15 @@ object ActorMonitor {
   }
 
   def createRegularActorMonitor(cellInfo: CellInfo): ActorMonitor = {
-    def actorMetrics = Kamon.metrics.entity(ActorMetrics, cellInfo.entity)
-
-    if (cellInfo.isTracked)
-      new TrackedActor(cellInfo.entity, actorMetrics)
-    else ActorMonitors.ContextPropagationOnly
+    if (cellInfo.isTracked || !cellInfo.trackingGroups.isEmpty) {
+      val actorMetrics = if (cellInfo.isTracked) Some(Kamon.metrics.entity(ActorMetrics, cellInfo.entity)) else None
+      val groupMetrics = cellInfo.trackingGroups.map { groupName =>
+        Kamon.metrics.entity(ActorGroupMetrics, Entity(ActorGroupConfig.ActorGroup, groupName))
+      }
+      new TrackedActor(cellInfo.entity, actorMetrics, groupMetrics)
+    } else {
+      ActorMonitors.ContextPropagationOnly
+    }
   }
 
   def createRouteeMonitor(cellInfo: CellInfo): ActorMonitor = {
@@ -65,9 +69,16 @@ object ActorMonitors {
 
   }
 
-  class TrackedActor(val entity: Entity, actorMetrics: ActorMetrics) extends ActorMonitor {
+  class TrackedActor(val entity: Entity, actorMetrics: Option[ActorMetrics], groupMetrics: List[ActorGroupMetrics]) extends ActorMonitor {
+
+    groupMetrics.foreach { gm =>
+      gm.actors.increment()
+    }
+
     def captureEnvelopeContext(): EnvelopeContext = {
-      actorMetrics.mailboxSize.increment()
+      actorMetrics.foreach { am =>
+        am.mailboxSize.increment()
+      }
       EnvelopeContext(RelativeNanoTimestamp.now, Tracer.currentContext)
     }
 
@@ -84,14 +95,34 @@ object ActorMonitors {
         val timeInMailbox = timestampBeforeProcessing - envelopeContext.nanoTime
         val processingTime = timestampAfterProcessing - timestampBeforeProcessing
 
-        actorMetrics.processingTime.record(processingTime.nanos)
-        actorMetrics.timeInMailbox.record(timeInMailbox.nanos)
-        actorMetrics.mailboxSize.decrement()
+        actorMetrics.foreach { am =>
+          am.processingTime.record(processingTime.nanos)
+          am.timeInMailbox.record(timeInMailbox.nanos)
+          am.mailboxSize.decrement()
+        }
+        groupMetrics.foreach { gm =>
+          gm.processingTime.record(processingTime.nanos)
+          gm.timeInMailbox.record(timeInMailbox.nanos)
+          gm.mailboxSize.decrement()
+        }
       }
     }
 
-    def processFailure(failure: Throwable): Unit = actorMetrics.errors.increment()
-    def cleanup(): Unit = Kamon.metrics.removeEntity(entity)
+    def processFailure(failure: Throwable): Unit = {
+      actorMetrics.foreach { am =>
+        am.errors.increment()
+      }
+      groupMetrics.foreach { gm =>
+        gm.errors.increment()
+      }
+    }
+
+    def cleanup(): Unit = {
+      Kamon.metrics.removeEntity(entity)
+      groupMetrics.foreach { gm =>
+        gm.actors.decrement()
+      }
+    }
   }
 
   class TrackedRoutee(val entity: Entity, routerMetrics: RouterMetrics) extends ActorMonitor {

@@ -3,10 +3,10 @@ package akka.kamon.instrumentation
 import akka.actor.{ Cell, ActorRef, ActorSystem }
 import akka.routing.{ NoRouter, RoutedActorRef, RoutedActorCell }
 import kamon.Kamon
-import kamon.akka.{ ActorMetrics, RouterMetrics }
+import kamon.akka.{ ActorMetrics, ActorGroupConfig, RouterMetrics }
 import kamon.metric.Entity
 
-case class CellInfo(entity: Entity, isRouter: Boolean, isRoutee: Boolean, isTracked: Boolean)
+case class CellInfo(entity: Entity, isRouter: Boolean, isRoutee: Boolean, isTracked: Boolean, trackingGroups: List[String])
 
 object CellInfo {
 
@@ -26,7 +26,8 @@ object CellInfo {
     val category = if (isRouter || isRoutee) RouterMetrics.category else ActorMetrics.category
     val entity = Entity(name, category)
     val isTracked = !isRootSupervisor && Kamon.metrics.shouldTrack(entity)
+    val trackingGroups = if(isRoutee && isRootSupervisor) List() else ActorGroupConfig.actorShouldBeTrackedUnderGroups(name)
 
-    CellInfo(entity, isRouter, isRoutee, isTracked)
+    CellInfo(entity, isRouter, isRoutee, isTracked, trackingGroups)
   }
 }
