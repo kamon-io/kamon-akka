@@ -17,12 +17,15 @@ package kamon.akka
 
 import kamon.testkit.BaseKamonSpec
 
-import scala.concurrent.duration._
-
 class ActorGroupConfigSpec extends BaseKamonSpec("actor-group-config-spec") {
   "the Kamon actor-group config" should {
     "should contain the expected group names" in {
-      ActorGroupConfig.groupNames should contain allOf ("test-group", "empty-group", "all-group")
+      ActorGroupConfig.groupNames should contain allOf ("test-group", "empty-group", "tracked-group")
     }
+    "track correct actor groups" in {
+      ActorGroupConfig.actorShouldBeTrackedUnderGroups("/user/tracked-actor") should contain theSameElementsAs List("tracked-group")
+      ActorGroupConfig.actorShouldBeTrackedUnderGroups("/user/non-tracked-actor") shouldBe empty
+    }
+
   }
 }

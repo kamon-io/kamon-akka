@@ -35,7 +35,7 @@ object ActorMonitor {
     if (cellInfo.isTracked || !cellInfo.trackingGroups.isEmpty) {
       val actorMetrics = if (cellInfo.isTracked) Some(Kamon.metrics.entity(ActorMetrics, cellInfo.entity)) else None
       val groupMetrics = cellInfo.trackingGroups.map { groupName =>
-        Kamon.metrics.entity(ActorGroupMetrics, Entity(ActorGroupConfig.ActorGroup, groupName))
+        Kamon.metrics.entity(ActorGroupMetrics, Entity(groupName, ActorGroupMetrics.category))
       }
       new TrackedActor(cellInfo.entity, actorMetrics, groupMetrics)
     } else {
@@ -78,6 +78,9 @@ object ActorMonitors {
     def captureEnvelopeContext(): EnvelopeContext = {
       actorMetrics.foreach { am =>
         am.mailboxSize.increment()
+      }
+      groupMetrics.foreach { gm =>
+        gm.mailboxSize.increment()
       }
       EnvelopeContext(RelativeNanoTimestamp.now, Tracer.currentContext)
     }

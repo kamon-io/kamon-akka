@@ -169,31 +169,3 @@ class ActorMetricsSpec extends BaseKamonSpec("actor-metrics-spec") {
     }
   }
 }
-
-class ActorMetricsTestActor extends Actor {
-  def receive = {
-    case Discard ⇒
-    case Fail    ⇒ throw new ArithmeticException("Division by zero.")
-    case Ping    ⇒ sender ! Pong
-    case TrackTimings(sendTimestamp, sleep) ⇒ {
-      val dequeueTimestamp = System.nanoTime()
-      sleep.map(s ⇒ Thread.sleep(s.toMillis))
-      val afterReceiveTimestamp = System.nanoTime()
-
-      sender ! TrackedTimings(sendTimestamp, dequeueTimestamp, afterReceiveTimestamp)
-    }
-  }
-}
-
-object ActorMetricsTestActor {
-  case object Ping
-  case object Pong
-  case object Fail
-  case object Discard
-
-  case class TrackTimings(sendTimestamp: Long = System.nanoTime(), sleep: Option[Duration] = None)
-  case class TrackedTimings(sendTimestamp: Long, dequeueTimestamp: Long, afterReceiveTimestamp: Long) {
-    def approximateTimeInMailbox: Long = dequeueTimestamp - sendTimestamp
-    def approximateProcessingTime: Long = afterReceiveTimestamp - dequeueTimestamp
-  }
-}
