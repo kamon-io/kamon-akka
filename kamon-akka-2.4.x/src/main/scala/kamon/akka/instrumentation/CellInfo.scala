@@ -6,14 +6,15 @@ import kamon.Kamon
 import kamon.akka.{ ActorMetrics, ActorGroupConfig, RouterMetrics }
 import kamon.metric.Entity
 
-case class CellInfo(entity: Entity, isRouter: Boolean, isRoutee: Boolean, isTracked: Boolean, trackingGroups: List[String])
+case class CellInfo(entity: Entity, isRouter: Boolean, isRoutee: Boolean,
+    isTracked: Boolean, trackingGroups: List[String], actorCellCreation: Boolean)
 
 object CellInfo {
 
   def cellName(system: ActorSystem, ref: ActorRef): String =
     system.name + "/" + ref.path.elements.mkString("/")
 
-  def cellInfoFor(cell: Cell, system: ActorSystem, ref: ActorRef, parent: ActorRef): CellInfo = {
+  def cellInfoFor(cell: Cell, system: ActorSystem, ref: ActorRef, parent: ActorRef, actorCellCreation: Boolean): CellInfo = {
     import kamon.metric.Entity
     def hasRouterProps(cell: Cell): Boolean = cell.props.deploy.routerConfig != NoRouter
 
@@ -28,6 +29,6 @@ object CellInfo {
     val isTracked = !isRootSupervisor && Kamon.metrics.shouldTrack(entity)
     val trackingGroups = if(isRoutee && isRootSupervisor) List() else ActorGroupConfig.actorShouldBeTrackedUnderGroups(name)
 
-    CellInfo(entity, isRouter, isRoutee, isTracked, trackingGroups)
+    CellInfo(entity, isRouter, isRoutee, isTracked, trackingGroups, actorCellCreation)
   }
 }

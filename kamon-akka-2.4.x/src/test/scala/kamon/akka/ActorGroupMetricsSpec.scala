@@ -34,21 +34,17 @@ class ActorGroupMetricsSpec extends BaseKamonSpec("actor-group-metrics-spec") {
     "respect the configured include and exclude filters" in new ActorGroupMetricsFixtures {
       val metric = Kamon.metrics.entity(ActorGroupMetrics,
           Entity("tracked-group", ActorGroupMetrics.category)).asInstanceOf[ActorGroupMetrics]
-      val firstSnapshot = metric.collect(collectionContext)
+      metric.collect(collectionContext)
       val trackedActor = createTestActor("tracked-actor")
       val nonTrackedActor = createTestActor("non-tracked-actor")
       system.stop(trackedActor)
       system.stop(nonTrackedActor)
-      val secondSnapshot = metric.collect(collectionContext)
-      //https://github.com/kamon-io/kamon-akka/issues/9 is open for investigating why this is 2
-      max(secondSnapshot, "actors") - max(firstSnapshot, "actors") shouldBe 2
+      max(metric.collect(collectionContext), "actors") shouldBe 1
       val trackedActor2 = createTestActor("tracked-actor2")
       val trackedActor3 = createTestActor("tracked-actor3")
       system.stop(trackedActor2)
       system.stop(trackedActor3)
-      val thirdSnapshot = metric.collect(collectionContext)
-      //https://github.com/kamon-io/kamon-akka/issues/9 - not sure why this is 3 and not 2 (expected) or 4 (issue 9)
-      max(thirdSnapshot, "actors") - max(secondSnapshot, "actors") shouldBe 3
+      max(metric.collect(collectionContext), "actors") shouldBe 2
     }
   }
 
