@@ -18,8 +18,8 @@ trait ActorMonitor {
 
 object ActorMonitor {
 
-  def createActorMonitor(cell: Cell, system: ActorSystem, ref: ActorRef, parent: ActorRef): ActorMonitor = {
-    val cellInfo = CellInfo.cellInfoFor(cell, system, ref, parent)
+  def createActorMonitor(cell: Cell, system: ActorSystem, ref: ActorRef, parent: ActorRef, actorCellCreation: Boolean): ActorMonitor = {
+    val cellInfo = CellInfo.cellInfoFor(cell, system, ref, parent, actorCellCreation)
 
     if (cellInfo.isRouter)
       ActorMonitors.ContextPropagationOnly
@@ -37,7 +37,7 @@ object ActorMonitor {
       val groupMetrics = cellInfo.trackingGroups.map { groupName =>
         Kamon.metrics.entity(ActorGroupMetrics, Entity(groupName, ActorGroupMetrics.category))
       }
-      new TrackedActor(cellInfo.entity, actorMetrics, groupMetrics)
+      new TrackedActor(cellInfo.entity, actorMetrics, groupMetrics, cellInfo.actorCellCreation)
     } else {
       ActorMonitors.ContextPropagationOnly
     }
@@ -69,10 +69,13 @@ object ActorMonitors {
 
   }
 
-  class TrackedActor(val entity: Entity, actorMetrics: Option[ActorMetrics], groupMetrics: List[ActorGroupMetrics]) extends ActorMonitor {
+  class TrackedActor(val entity: Entity, actorMetrics: Option[ActorMetrics],
+      groupMetrics: List[ActorGroupMetrics], actorCellCreation: Boolean) extends ActorMonitor {
 
-    groupMetrics.foreach { gm =>
-      gm.actors.increment()
+    if (actorCellCreation) {
+      groupMetrics.foreach { gm =>
+        gm.actors.increment()
+      }
     }
 
     def captureEnvelopeContext(): EnvelopeContext = {
@@ -122,8 +125,10 @@ object ActorMonitors {
 
     def cleanup(): Unit = {
       Kamon.metrics.removeEntity(entity)
-      groupMetrics.foreach { gm =>
-        gm.actors.decrement()
+      if (actorCellCreation) {
+        groupMetrics.foreach { gm =>
+          gm.actors.decrement()
+        }
       }
     }
   }
