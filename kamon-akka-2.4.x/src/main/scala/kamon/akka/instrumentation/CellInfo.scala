@@ -27,7 +27,7 @@ object CellInfo {
     val category = if (isRouter || isRoutee) RouterMetrics.category else ActorMetrics.category
     val entity = Entity(name, category)
     val isTracked = !isRootSupervisor && Kamon.metrics.shouldTrack(entity)
-    val trackingGroups = if(isRoutee && isRootSupervisor) List() else ActorGroupConfig.actorShouldBeTrackedUnderGroups(name)
+    val trackingGroups = if(isRootSupervisor) List() else ActorGroupConfig.actorShouldBeTrackedUnderGroups(name)
 
     CellInfo(entity, isRouter, isRoutee, isTracked, trackingGroups, actorCellCreation)
   }
