@@ -15,6 +15,11 @@
 
 package kamon.akka
 
+import scala.concurrent.{ Await, Future }
+import scala.concurrent.duration.DurationInt
+
+import org.scalatest.concurrent.Eventually
+
 import akka.actor.{ ActorRef, Props }
 import akka.dispatch.MessageDispatcher
 import akka.routing.BalancingPool
@@ -25,10 +30,7 @@ import kamon.metric.{ EntityRecorder, EntitySnapshot }
 import kamon.testkit.BaseKamonSpec
 import kamon.util.executors.{ ForkJoinPoolMetrics, ThreadPoolExecutorMetrics }
 
-import scala.concurrent.duration._
-import scala.concurrent.{ Await, Future }
-
-class DispatcherMetricsSpec extends BaseKamonSpec("dispatcher-metrics-spec") {
+class DispatcherMetricsSpec extends BaseKamonSpec("dispatcher-metrics-spec") with Eventually {
   "the Kamon dispatcher metrics" should {
     "respect the configured include and exclude filters" in {
       val defaultDispatcher = forceInit(system.dispatchers.lookup("akka.actor.default-dispatcher"))
@@ -56,16 +58,18 @@ class DispatcherMetricsSpec extends BaseKamonSpec("dispatcher-metrics-spec") {
       refreshDispatcherInstruments(tpeDispatcher, "thread-pool-executor")
       val snapshot = collectDispatcherMetrics(tpeDispatcher, "thread-pool-executor")
 
-      snapshot.gauge("active-threads") should not be empty
-      snapshot.gauge("pool-size").get.min should be >= 7L
-      snapshot.gauge("pool-size").get.max should be <= 21L
-      snapshot.gauge("max-pool-size").get.max should be(21)
-      snapshot.gauge("core-pool-size").get.max should be(21)
-      snapshot.gauge("processed-tasks").get.max should be(102L +- 5L)
+      eventually(timeout(5.seconds)) {
+        snapshot.gauge("active-threads") should not be empty
+        snapshot.gauge("pool-size").get.min should be >= 7L
+        snapshot.gauge("pool-size").get.max should be <= 21L
+        snapshot.gauge("max-pool-size").get.max should be(21)
+        snapshot.gauge("core-pool-size").get.max should be(21)
+        snapshot.gauge("processed-tasks").get.max should be(102L +- 5L)
 
-      // The processed tasks should be reset to 0 if no more tasks are submitted.
-      val secondSnapshot = collectDispatcherMetrics(tpeDispatcher, "thread-pool-executor")
-      secondSnapshot.gauge("processed-tasks").get.max should be(0)
+        // The processed tasks should be reset to 0 if no more tasks are submitted.
+        val secondSnapshot = collectDispatcherMetrics(tpeDispatcher, "thread-pool-executor")
+        secondSnapshot.gauge("processed-tasks").get.max should be(0)
+      }
     }
 
     "record metrics for a dispatcher with fork-join-executor" in {
@@ -164,7 +168,4 @@ class DispatcherMetricsSpec extends BaseKamonSpec("dispatcher-metrics-spec") {
     shutdownMethod.setAccessible(true)
     shutdownMethod.invoke(dispatcher)
   }
-
-  override protected def afterAll(): Unit = system.shutdown()
 }
-

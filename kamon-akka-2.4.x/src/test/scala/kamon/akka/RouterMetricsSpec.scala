@@ -17,18 +17,20 @@ package kamon.akka
 
 import java.nio.LongBuffer
 
-import akka.actor._
-import akka.routing._
+import scala.concurrent.duration.DurationInt
+
+import org.scalatest.concurrent.Eventually
+
+import akka.actor.{ ActorRef, PoisonPill, Props, actorRef2Scala }
+import akka.routing.{ BalancingPool, RoundRobinGroup, RoundRobinPool }
 import akka.testkit.TestProbe
 import kamon.Kamon
-import kamon.akka.RouterMetricsTestActor._
+import kamon.akka.RouterMetricsTestActor.{ Fail, Ping, Pong, RouterTrackTimings, RouterTrackedTimings }
 import kamon.metric.EntitySnapshot
 import kamon.metric.instrument.CollectionContext
 import kamon.testkit.BaseKamonSpec
 
-import scala.concurrent.duration._
-
-class RouterMetricsSpec extends BaseKamonSpec("router-metrics-spec") {
+class RouterMetricsSpec extends BaseKamonSpec("router-metrics-spec") with Eventually {
 
   "the Kamon router metrics" should {
     "respect the configured include and exclude filters" in new RouterMetricsFixtures {
@@ -55,7 +57,9 @@ class RouterMetricsSpec extends BaseKamonSpec("router-metrics-spec") {
       listener.expectMsg(Pong)
       val routerSnapshot = collectMetricsOf("user/measuring-routing-time-in-pool-router").get
 
-      routerSnapshot.histogram("routing-time").get.numberOfMeasurements should be(1L)
+      eventually(timeout(5.seconds)) {
+        routerSnapshot.histogram("routing-time").get.numberOfMeasurements should be(1L)
+      }
     }
     /*
     "record the routing-time of the receive function for group routers" in new RouterMetricsFixtures {
@@ -75,11 +79,13 @@ class RouterMetricsSpec extends BaseKamonSpec("router-metrics-spec") {
 
       router.tell(RouterTrackTimings(sleep = Some(1 second)), timingsListener.ref)
       val timings = timingsListener.expectMsgType[RouterTrackedTimings]
-      val routerSnapshot = collectMetricsOf("user/measuring-processing-time-in-pool-router").get
 
-      routerSnapshot.histogram("processing-time").get.numberOfMeasurements should be(1L)
-      routerSnapshot.histogram("processing-time").get.recordsIterator.next().count should be(1L)
-      routerSnapshot.histogram("processing-time").get.recordsIterator.next().level should be(timings.approximateProcessingTime +- 10.millis.toNanos)
+      eventually(timeout(5.seconds)) {
+        val routerSnapshot = collectMetricsOf("user/measuring-processing-time-in-pool-router").get
+        routerSnapshot.histogram("processing-time").get.numberOfMeasurements should be(1L)
+        routerSnapshot.histogram("processing-time").get.recordsIterator.next().count should be(1L)
+        routerSnapshot.histogram("processing-time").get.recordsIterator.next().level should be(timings.approximateProcessingTime +- 10.millis.toNanos)
+      }
     }
 
     /*
@@ -108,8 +114,10 @@ class RouterMetricsSpec extends BaseKamonSpec("router-metrics-spec") {
       router.tell(Ping, listener.ref)
       listener.expectMsg(Pong)
 
-      val routerSnapshot = collectMetricsOf("user/measuring-errors-in-pool-router").get
-      routerSnapshot.counter("errors").get.count should be(10L)
+      eventually(timeout(5.seconds)) {
+        val routerSnapshot = collectMetricsOf("user/measuring-errors-in-pool-router").get
+        routerSnapshot.counter("errors").get.count should be(10L)
+      }
     }
 
     /*    "record the number of errors for group routers" in new RouterMetricsFixtures {
@@ -133,11 +141,13 @@ class RouterMetricsSpec extends BaseKamonSpec("router-metrics-spec") {
 
       router.tell(RouterTrackTimings(sleep = Some(1 second)), timingsListener.ref)
       val timings = timingsListener.expectMsgType[RouterTrackedTimings]
-      val routerSnapshot = collectMetricsOf("user/measuring-time-in-mailbox-in-pool-router").get
 
-      routerSnapshot.histogram("time-in-mailbox").get.numberOfMeasurements should be(1L)
-      routerSnapshot.histogram("time-in-mailbox").get.recordsIterator.next().count should be(1L)
-      routerSnapshot.histogram("time-in-mailbox").get.recordsIterator.next().level should be(timings.approximateTimeInMailbox +- 10.millis.toNanos)
+      eventually(timeout(5.seconds)) {
+        val routerSnapshot = collectMetricsOf("user/measuring-time-in-mailbox-in-pool-router").get
+        routerSnapshot.histogram("time-in-mailbox").get.numberOfMeasurements should be(1L)
+        routerSnapshot.histogram("time-in-mailbox").get.recordsIterator.next().count should be(1L)
+        routerSnapshot.histogram("time-in-mailbox").get.recordsIterator.next().level should be(timings.approximateTimeInMailbox +- 10.millis.toNanos)
+      }
     }
 
     "record the time-in-mailbox for balancing pool routers" in new RouterMetricsFixtures {
@@ -146,11 +156,13 @@ class RouterMetricsSpec extends BaseKamonSpec("router-metrics-spec") {
 
       router.tell(RouterTrackTimings(sleep = Some(1 second)), timingsListener.ref)
       val timings = timingsListener.expectMsgType[RouterTrackedTimings]
-      val routerSnapshot = collectMetricsOf("user/measuring-time-in-mailbox-in-balancing-pool-router").get
 
-      routerSnapshot.histogram("time-in-mailbox").get.numberOfMeasurements should be(1L)
-      routerSnapshot.histogram("time-in-mailbox").get.recordsIterator.next().count should be(1L)
-      routerSnapshot.histogram("time-in-mailbox").get.recordsIterator.next().level should be(timings.approximateTimeInMailbox +- 10.millis.toNanos)
+      eventually(timeout(5.seconds)) {
+        val routerSnapshot = collectMetricsOf("user/measuring-time-in-mailbox-in-balancing-pool-router").get
+        routerSnapshot.histogram("time-in-mailbox").get.numberOfMeasurements should be(1L)
+        routerSnapshot.histogram("time-in-mailbox").get.recordsIterator.next().count should be(1L)
+        routerSnapshot.histogram("time-in-mailbox").get.recordsIterator.next().level should be(timings.approximateTimeInMailbox +- 10.millis.toNanos)
+      }
     }
 
     /*
