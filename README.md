@@ -17,17 +17,22 @@ Supported releases and dependencies are shown below.
 
 | kamon-akka-2.3  | status | jdk  | scala            | akka   |
 |:------:|:------:|:----:|------------------|:------:|
-|  0.6.6 | stable | 1.7+, 1.8+ | 2.10, 2.11  | 2.3.x |
+|  0.6.7 | stable | 1.7+, 1.8+ | 2.10, 2.11  | 2.3.x |
 
 | kamon-akka-2.4  | status | jdk  | scala            | akka   |
 |:------:|:------:|:----:|------------------|:------:|
-|  0.6.6 | stable | 1.7+, 1.8+ | 2.11, 2.12  | 2.4.x |
+|  0.6.7 | stable | 1.7+, 1.8+ | 2.11, 2.12  | 2.4.x |
+
+| kamon-akka-2.5  | status | jdk  | scala            | akka   |
+|:------:|:------:|:----:|------------------|:------:|
+|  0.6.7 | stable | 1.8+ | 2.11, 2.12  | 2.5.x |
+
 
 To get started with SBT, simply add the following to your `build.sbt`
 file:
 
 ```scala
-libraryDependencies += "io.kamon" %% "kamon-akka-2.4" % "0.6.6"
+libraryDependencies += "io.kamon" %% "kamon-akka-2.5" % "0.6.7"
 ```
 
 Here is a quick list of the functionalities included in the module:

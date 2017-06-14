@@ -27,7 +27,7 @@ def akkaDependency(name: String, version: String) = {
 
 lazy val `kamon-akka` = (project in file("."))
     .settings(noPublishing: _*)
-    .aggregate(kamonAkka23, kamonAkka24)
+    .aggregate(kamonAkka23, kamonAkka24, kamonAkka25)
 
 
 lazy val kamonAkka23 = Project("kamon-akka-23", file("kamon-akka-2.3.x"))
