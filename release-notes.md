@@ -1,7 +1,7 @@
 kamon-akka release notes
 ------------------------
 
-### 4. Jun 2017: version 0.6.7
+### 14. Jun 2017: version 0.6.7
 
 - Akka 2.5.x support
 
