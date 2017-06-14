@@ -14,10 +14,12 @@
  */
 
 
-val kamonCore = "io.kamon" %% "kamon-core" % "0.6.6"
-val kamonScala = "io.kamon" %% "kamon-scala" % "0.6.6"
-val `akka-2.3` = "2.3.13"
-val `akka-2.4` = "2.4.16"
+val kamonCore = "io.kamon" %% "kamon-core" % "0.6.7"
+val kamonScala = "io.kamon" %% "kamon-scala" % "0.6.7"
+
+val `akka-2.3` = "2.3.16"
+val `akka-2.4` = "2.4.18"
+val `akka-2.5` = "2.5.2"
 
 def akkaDependency(name: String, version: String) = {
   "com.typesafe.akka" %% s"akka-$name" % version
@@ -56,6 +58,22 @@ lazy val kamonAkka24 = Project("kamon-akka-24", file("kamon-akka-2.4.x"))
       providedScope(aspectJ) ++
       optionalScope(logbackClassic) ++
       testScope(scalatest, akkaDependency("testkit", `akka-2.4`), akkaDependency("slf4j", `akka-2.4`), logbackClassic))
+
+
+lazy val kamonAkka25 = Project("kamon-akka-25", file("kamon-akka-2.5.x"))
+  .settings(Seq(
+    bintrayPackage := "kamon-akka",
+    moduleName := "kamon-akka-2.5",
+    scalaVersion := "2.12.1",
+    crossScalaVersions := Seq("2.11.8", "2.12.1")))
+  .settings(aspectJSettings: _*)
+  .settings(
+    libraryDependencies ++=
+      compileScope(akkaDependency("actor", `akka-2.5`), kamonCore, kamonScala) ++
+        providedScope(aspectJ) ++
+        optionalScope(logbackClassic) ++
+        testScope(scalatest, akkaDependency("testkit", `akka-2.5`), akkaDependency("slf4j", `akka-2.5`), logbackClassic))
+
 
 
 enableProperCrossScalaVersionTasks
