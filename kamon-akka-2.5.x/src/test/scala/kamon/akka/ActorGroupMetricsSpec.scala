@@ -20,15 +20,15 @@ import java.nio.LongBuffer
 import akka.actor._
 import akka.routing.RoundRobinPool
 import akka.testkit.TestProbe
-import com.typesafe.config.ConfigFactory
 import kamon.Kamon
 import kamon.metric.{Entity, EntitySnapshot}
 import kamon.metric.instrument.CollectionContext
 import kamon.testkit.BaseKamonSpec
-
+import org.scalatest.concurrent.Eventually
+import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import scala.concurrent.duration._
 
-class ActorGroupMetricsSpec extends BaseKamonSpec("actor-group-metrics-spec") {
+class ActorGroupMetricsSpec extends BaseKamonSpec("actor-group-metrics-spec") with Eventually {
 
   "the Kamon actor-group metrics" should {
     "respect the configured include and exclude filters for actors" in new ActorGroupMetricsFixtures {
@@ -37,29 +37,31 @@ class ActorGroupMetricsSpec extends BaseKamonSpec("actor-group-metrics-spec") {
       metric.collect(collectionContext)
       val trackedActor = createTestActor("tracked-actor")
       val nonTrackedActor = createTestActor("non-tracked-actor")
+      eventually(max(metric.collect(collectionContext), "actors") shouldBe 1)
       system.stop(trackedActor)
       system.stop(nonTrackedActor)
-      max(metric.collect(collectionContext), "actors") shouldBe 1
+      eventually(max(metric.collect(collectionContext), "actors") shouldBe 0)
       val trackedActor2 = createTestActor("tracked-actor2")
       val trackedActor3 = createTestActor("tracked-actor3")
+      eventually(max(metric.collect(collectionContext), "actors") shouldBe 2)
       system.stop(trackedActor2)
       system.stop(trackedActor3)
-      max(metric.collect(collectionContext), "actors") shouldBe 2
+      eventually(max(metric.collect(collectionContext), "actors") shouldBe 0)
     }
     "respect the configured include and exclude filters for routees" in new ActorGroupMetricsFixtures {
       val metric = Kamon.metrics.entity(ActorGroupMetrics,
           Entity("tracked-group", ActorGroupMetrics.category)).asInstanceOf[ActorGroupMetrics]
-      metric.collect(collectionContext)
       val trackedRouter = createTestPoolRouter("tracked-router")
       val nonTrackedRouter = createTestPoolRouter("non-tracked-router")
+      max(metric.collect(collectionContext), "actors") shouldBe 5
       system.stop(trackedRouter)
       system.stop(nonTrackedRouter)
-      max(metric.collect(collectionContext), "actors") shouldBe 5
       val trackedActor2 = createTestPoolRouter("tracked-router2")
       val trackedActor3 = createTestPoolRouter("tracked-router3")
+      eventually(max(metric.collect(collectionContext), "actors") shouldBe 10)
       system.stop(trackedActor2)
       system.stop(trackedActor3)
-      max(metric.collect(collectionContext), "actors") shouldBe 10
+      eventually(max(metric.collect(collectionContext), "actors") shouldBe 0)
     }
   }
 

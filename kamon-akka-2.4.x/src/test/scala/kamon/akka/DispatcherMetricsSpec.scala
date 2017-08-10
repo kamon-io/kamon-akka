@@ -15,20 +15,20 @@
 
 package kamon.akka
 
-import scala.concurrent.{ Await, Future }
+import java.util.concurrent.ThreadPoolExecutor
+
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration.DurationInt
-
 import org.scalatest.concurrent.Eventually
-
-import akka.actor.{ ActorRef, Props }
+import akka.actor.{ActorRef, Props}
 import akka.dispatch.MessageDispatcher
 import akka.routing.BalancingPool
 import akka.testkit.TestProbe
 import kamon.Kamon
-import kamon.akka.RouterMetricsTestActor.{ Ping, Pong }
-import kamon.metric.{ EntityRecorder, EntitySnapshot }
+import kamon.akka.RouterMetricsTestActor.{Ping, Pong}
+import kamon.metric.{EntityRecorder, EntitySnapshot}
 import kamon.testkit.BaseKamonSpec
-import kamon.util.executors.{ ForkJoinPoolMetrics, ThreadPoolExecutorMetrics }
+import kamon.util.executors.{ForkJoinPoolMetrics, ThreadPoolExecutorMetrics}
 
 class DispatcherMetricsSpec extends BaseKamonSpec("dispatcher-metrics-spec") with Eventually {
   "the Kamon dispatcher metrics" should {
@@ -45,7 +45,7 @@ class DispatcherMetricsSpec extends BaseKamonSpec("dispatcher-metrics-spec") wit
     }
 
     "record metrics for a dispatcher with thread-pool-executor" in {
-      implicit val tpeDispatcher = system.dispatchers.lookup("tracked-tpe")
+      implicit val tpeDispatcher = forceInit(system.dispatchers.lookup("tracked-tpe"))
       refreshDispatcherInstruments(tpeDispatcher, "thread-pool-executor")
       collectDispatcherMetrics(tpeDispatcher, "thread-pool-executor")
 
@@ -58,23 +58,24 @@ class DispatcherMetricsSpec extends BaseKamonSpec("dispatcher-metrics-spec") wit
       refreshDispatcherInstruments(tpeDispatcher, "thread-pool-executor")
       val snapshot = collectDispatcherMetrics(tpeDispatcher, "thread-pool-executor")
 
-      eventually(timeout(5.seconds)) {
-        snapshot.gauge("active-threads") should not be empty
-        snapshot.gauge("pool-size").get.min should be >= 7L
-        snapshot.gauge("pool-size").get.max should be <= 21L
-        snapshot.gauge("max-pool-size").get.max should be(21)
-        snapshot.gauge("core-pool-size").get.max should be(21)
-        snapshot.gauge("processed-tasks").get.max should be(102L +- 5L)
+      snapshot.gauge("active-threads") should not be empty
+      snapshot.gauge("pool-size").get.max should be <= 21L
+      snapshot.gauge("max-pool-size").get.max should be(21)
+      snapshot.gauge("core-pool-size").get.max should be(21)
+      snapshot.gauge("processed-tasks").get.max should be >= 0L
 
-        // The processed tasks should be reset to 0 if no more tasks are submitted.
-        val secondSnapshot = collectDispatcherMetrics(tpeDispatcher, "thread-pool-executor")
-        secondSnapshot.gauge("processed-tasks").get.max should be(0)
-      }
+      // The processed tasks should be reset to 0 if no more tasks are submitted.
+      val secondSnapshot = collectDispatcherMetrics(tpeDispatcher, "thread-pool-executor")
+      secondSnapshot.gauge("processed-tasks").get.max should be(0)
+
     }
 
     "record metrics for a dispatcher with fork-join-executor" in {
-      implicit val fjpDispatcher = system.dispatchers.lookup("tracked-fjp")
+      implicit val fjpDispatcher = forceInit(system.dispatchers.lookup("tracked-fjp"))
       collectDispatcherMetrics(fjpDispatcher, "fork-join-pool")
+
+      //pool warmup
+      for (_ ← 1 to 30) yield submit(fjpDispatcher)
 
       Await.result({
         Future.sequence {
@@ -86,7 +87,7 @@ class DispatcherMetricsSpec extends BaseKamonSpec("dispatcher-metrics-spec") wit
       val snapshot = collectDispatcherMetrics(fjpDispatcher, "fork-join-pool")
 
       snapshot.minMaxCounter("parallelism").get.max should be(22)
-      snapshot.gauge("pool-size").get.min should be >= 0L
+      snapshot.gauge("pool-size").get.min should be > 0L
       snapshot.gauge("pool-size").get.max should be <= 22L
       snapshot.gauge("active-threads").get.max should be >= 0L
       snapshot.gauge("running-threads").get.max should be >= 0L
@@ -160,6 +161,7 @@ class DispatcherMetricsSpec extends BaseKamonSpec("dispatcher-metrics-spec") wit
   }
 
   def submit(dispatcher: MessageDispatcher): Future[String] = Future {
+    Thread.sleep(1)
     "hello"
   }(dispatcher)
 

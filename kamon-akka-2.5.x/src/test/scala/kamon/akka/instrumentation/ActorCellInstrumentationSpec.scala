@@ -15,16 +15,21 @@
  * ========================================================== */
 package kamon.instrumentation.akka
 
-import akka.actor.{ Actor, Props }
-import akka.pattern.{ ask, pipe }
+import akka.actor.{Actor, ActorRef, PoisonPill, Props}
+import akka.pattern.{ask, pipe}
 import akka.routing._
 import akka.util.Timeout
+import kamon.Kamon
+import kamon.akka.ActorMetrics
+import kamon.metric.EntityRecorder
 import kamon.testkit.BaseKamonSpec
 import kamon.trace.Tracer
+import org.scalatest.concurrent.Eventually
 
+import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 
-class ActorCellInstrumentationSpec extends BaseKamonSpec("actor-cell-instrumentation-spec") {
+class ActorCellInstrumentationSpec extends BaseKamonSpec("actor-cell-instrumentation-spec") with Eventually {
   implicit lazy val executionContext = system.dispatcher
 
   "the message passing instrumentation" should {
@@ -86,6 +91,25 @@ class ActorCellInstrumentationSpec extends BaseKamonSpec("actor-cell-instrumenta
       }
 
       expectMsg(testTraceContext)
+    }
+
+    "be cleaned up in case of a RepointableActorRef" in {
+      def actorRecorderName(ref: ActorRef): String = system.name + "/" + ref.path.elements.mkString("/")
+
+      def actorMetricsRecorderOf(name: String): Option[EntityRecorder] =
+        Kamon.metrics.find(name, ActorMetrics.category)
+
+      val buffer = new ListBuffer[String]
+
+      for(j <- 1 to 10) {
+        for (i <- 1 to 1000) {
+          val a = system.actorOf(Props[TraceContextEcho], s"actor$j$i")
+          a ! PoisonPill
+          buffer.append(actorRecorderName(a))
+        }
+        eventually(for(p <- buffer) actorMetricsRecorderOf(p) should be(None))
+        buffer.clear()
+      }
     }
   }
 
