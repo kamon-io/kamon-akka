@@ -1,6 +1,10 @@
 kamon-akka release notes
 ------------------------
 
+### 10. Aug 2017: version 0.6.8
+
+- clear entity recorders on actor terminate instead of stop, align `replaceWith` advice - by @mladens
+
 ### 14. Jun 2017: version 0.6.7
 
 - Akka 2.5.x support
